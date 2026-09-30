@@ -57,8 +57,8 @@
 <figure class="center"><img src="media/dolly_zoom.gif" alt="dolly zoom gif"><figcaption>Moving back while zooming in</figcaption></figure>
 
 <h3>Why the photos look different</h3>
-<p>Camera distance changes the proportions. In the close selfie, my nose is closer to the camera than my ears,
-so it looks larger. From farther away, that difference in depth matters less, and my face looks more natural.
+<p>Camera distance changes the proportions. In the close selfie, the parts of the face closest to the camera look much larger. 
+From farther away, that difference in depth matters less, and the face looks more natural.
 The street photos show the same effect: nearby buildings look much larger when I stand close, while the view from
 farther away looks flatter. Zoom changes the size of the image without changing those proportions. In the dolly
 zoom, I stepped back and zoomed in to keep the car about the same size. The house behind it was much farther away,
@@ -75,7 +75,8 @@ match B, then stack them into an RGB image.</p>
 <p>I read each plate as a grayscale image and divide its height into three equal parts. Integer division drops
 one or two leftover rows at the bottom. A 1024 &times; 396 plate, for example, gives three channels of
 341 &times; 396 pixels.</p>
-<p>Before comparing channels, I convert the pixel values to floats. The image initially stores each pixel as
+<p>Following the tips in the assignment, I convert the pixel values to floats before comparing channels. 
+The image initially stores each pixel as
 <code>uint8</code>, an integer from 0 to 255. That type cannot represent a negative result: 3 &minus; 5 would
 wrap around to 254 instead of &minus;2. Floats let me calculate those differences correctly. I also divide
 the values by 255 to put them in the range [0, 1].</p>
@@ -90,14 +91,15 @@ I downloaded myself:</p>
   <figure><img src="media/naive_loc1_01043.jpg" alt="without alignment"><figcaption>prok.01043, stacked without alignment</figcaption></figure>
   <figure><img src="media/pyramid_loc1_01043.jpg" alt="with alignment"><figcaption>prok.01043, after pyramid alignment</figcaption></figure>
 </div>
-<p>The shifts are larger on the big plates, so their unaligned color images are hard to make out.</p>
+<p>The shifts are larger on the big plates, so their unaligned colour images are hard to make out.</p>
 
 <h3>Step 2: Scoring an alignment with L2</h3>
 <p>I score each possible shift by measuring the L2 distance between the shifted channel and the blue channel:</p>
 <pre>L2(a, b) = sqrt( sum over all pixels of (a - b)^2 )</pre>
 <p>For each pixel, I subtract one channel value from the other, square the difference, add up the squares,
 and take the square root. A <b>smaller</b> score means the channels match more closely.</p>
-<p>I use <code>np.roll</code> to shift a channel. It keeps the image size fixed by wrapping pixels that leave
+<p>Following the tips in the assignment, I use <code>np.roll</code> to shift a channel. 
+It keeps the image size fixed by wrapping pixels that leave
 one edge around to the opposite edge. Those pixels would give misleading scores, as would the dark plate
 borders, which differ between channels. I therefore score only the middle of each image, leaving out 10% on
 every side. On a small channel, the vertical margin is about 34 rows, more than the largest shift I search,
@@ -131,58 +133,44 @@ misaligned. The &plusmn;20 window worked best across the 12 small images, so tha
 
 <!-- ============================================================ -->
 <h3>Step 4: Image pyramid for the large images</h3>
-<p>On the large plates, each color channel is about 3238 &times; 3800 pixels, and the shifts are much bigger
+<p>On the large plates, each colour channel is about 3238 &times; 3800 pixels, and the shifts are much bigger
 than on the small images. A wide search at full resolution would exceed the assignment's target of under one
 minute per image. I used an image pyramid instead: start with a small copy to estimate the shift, then refine
 it at larger sizes.</p>
 
 <p><b>Shrinking by half.</b> Before keeping every other row and column, I blur the image so a narrow detail
 is less likely to disappear between sampled pixels. In each direction, the blur uses
-(neighbor + 2 &times; current pixel + other neighbor) / 4. This is a convolution with the kernel
+(neighbour + 2 &times; current pixel + other neighbour) / 4. This is a convolution with the kernel
 [1, 2, 1] / 4, applied vertically and then horizontally. The weights add to one, so the blur keeps the
 overall brightness unchanged.</p>
 
 <p><b>Coarse-to-fine search.</b> When the image is small enough, I run the same single-scale search used above.
 Otherwise, I halve both images and search at that smaller size first. I double the returned offset to bring it
-back to the current scale, then check a &plusmn;2 neighborhood for a better match. I repeat this as I return to
+back to the current scale, then check a &plusmn;2 neighbourhood for a better match. I repeat this as I return to
 full resolution. The wide search happens only on the smallest copy, where it costs about as much as it does for
 a small JPEG.</p>
 
 <h3>Pyramid results (all images in the data folder)</h3>
 <div class="grid">
-  <figure><img src="media/pyramid_00056v.jpg" alt=""><figcaption>00056v</figcaption></figure>
-  <figure><img src="media/pyramid_00125v.jpg" alt=""><figcaption>00125v</figcaption></figure>
-  <figure><img src="media/pyramid_00163v.jpg" alt=""><figcaption>00163v</figcaption></figure>
-  <figure><img src="media/pyramid_00458u.jpg" alt=""><figcaption>00458u</figcaption></figure>
-  <figure><img src="media/pyramid_00804v.jpg" alt=""><figcaption>00804v</figcaption></figure>
-  <figure><img src="media/pyramid_01007a.jpg" alt=""><figcaption>01007a</figcaption></figure>
-  <figure><img src="media/pyramid_01047u.jpg" alt=""><figcaption>01047u</figcaption></figure>
-  <figure><img src="media/pyramid_01164v.jpg" alt=""><figcaption>01164v</figcaption></figure>
-  <figure><img src="media/pyramid_01269v.jpg" alt=""><figcaption>01269v</figcaption></figure>
-  <figure><img src="media/pyramid_01522v.jpg" alt=""><figcaption>01522v</figcaption></figure>
-  <figure><img src="media/pyramid_01597v.jpg" alt=""><figcaption>01597v</figcaption></figure>
-  <figure><img src="media/pyramid_01598v.jpg" alt=""><figcaption>01598v</figcaption></figure>
-  <figure><img src="media/pyramid_01657u.jpg" alt=""><figcaption>01657u</figcaption></figure>
-  <figure><img src="media/pyramid_01725u.jpg" alt=""><figcaption>01725u</figcaption></figure>
-  <figure><img src="media/pyramid_01728v.jpg" alt=""><figcaption>01728v</figcaption></figure>
-  <figure><img src="media/pyramid_01861a.jpg" alt=""><figcaption>01861a</figcaption></figure>
-  <figure><img src="media/pyramid_10131v.jpg" alt=""><figcaption>10131v</figcaption></figure>
-  <figure><img src="media/pyramid_31421v.jpg" alt=""><figcaption>31421v</figcaption></figure>
+    <figure><img src="media/pyramid_00056v.jpg" alt=""><figcaption>00056v &mdash; G (1, 6), R (1, 13)</figcaption></figure>
+  <figure><img src="media/pyramid_00125v.jpg" alt=""><figcaption>00125v &mdash; G (2, 5), R (1, 10)</figcaption></figure>
+  <figure><img src="media/pyramid_00163v.jpg" alt=""><figcaption>00163v &mdash; G (1, &minus;3), R (1, &minus;4)</figcaption></figure>
+  <figure><img src="media/pyramid_00458u.jpg" alt=""><figcaption>00458u &mdash; G (6, 43), R (32, 87)</figcaption></figure>
+  <figure><img src="media/pyramid_00804v.jpg" alt=""><figcaption>00804v &mdash; G (&minus;2, 6), R (&minus;4, 13)</figcaption></figure>
+  <figure><img src="media/pyramid_01007a.jpg" alt=""><figcaption>01007a &mdash; G (14, 60), R (13, 129)</figcaption></figure>
+  <figure><img src="media/pyramid_01047u.jpg" alt=""><figcaption>01047u &mdash; G (20, 24), R (33, 71)</figcaption></figure>
+  <figure><img src="media/pyramid_01164v.jpg" alt=""><figcaption>01164v &mdash; G (2, 6), R (3, 11)</figcaption></figure>
+  <figure><img src="media/pyramid_01269v.jpg" alt=""><figcaption>01269v &mdash; G (2, 6), R (3, 14)</figcaption></figure>
+  <figure><img src="media/pyramid_01522v.jpg" alt=""><figcaption>01522v &mdash; G (2, 6), R (1, 13)</figcaption></figure>
+  <figure><img src="media/pyramid_01597v.jpg" alt=""><figcaption>01597v &mdash; G (1, 7), R (1, 16)</figcaption></figure>
+  <figure><img src="media/pyramid_01598v.jpg" alt=""><figcaption>01598v &mdash; G (0, 8), R (&minus;1, 17)</figcaption></figure>
+  <figure><img src="media/pyramid_01657u.jpg" alt=""><figcaption>01657u &mdash; G (8, 56), R (11, 116)</figcaption></figure>
+  <figure><img src="media/pyramid_01725u.jpg" alt=""><figcaption>01725u &mdash; G (44, 77), R (77, 162)</figcaption></figure>
+  <figure><img src="media/pyramid_01728v.jpg" alt=""><figcaption>01728v &mdash; G (1, 8), R (1, 18)</figcaption></figure>
+  <figure><img src="media/pyramid_01861a.jpg" alt=""><figcaption>01861a &mdash; G (38, 71), R (62, 148)</figcaption></figure>
+  <figure><img src="media/pyramid_10131v.jpg" alt=""><figcaption>10131v &mdash; G (2, 6), R (3, 12)</figcaption></figure>
+  <figure><img src="media/pyramid_31421v.jpg" alt=""><figcaption>31421v &mdash; G (0, 8), R (0, 13)</figcaption></figure>
 </div>
-
-<p><b>Computed offsets</b> (x, y), relative to the blue image:</p>
-<table>
-  <tr><th>Image</th><th>G offset</th><th>R offset</th><th>Image</th><th>G offset</th><th>R offset</th></tr>
-  <tr><td>00056v</td><td>(1, 6)</td><td>(1, 13)</td><td>01522v</td><td>(2, 6)</td><td>(1, 13)</td></tr>
-  <tr><td>00125v</td><td>(2, 5)</td><td>(1, 10)</td><td>01597v</td><td>(1, 7)</td><td>(1, 16)</td></tr>
-  <tr><td>00163v</td><td>(1, &minus;3)</td><td>(1, &minus;4)</td><td>01598v</td><td>(0, 8)</td><td>(&minus;1, 17)</td></tr>
-  <tr><td>00458u</td><td>(6, 43)</td><td>(32, 87)</td><td>01657u</td><td>(8, 56)</td><td>(11, 116)</td></tr>
-  <tr><td>00804v</td><td>(&minus;2, 6)</td><td>(&minus;4, 13)</td><td>01725u</td><td>(44, 77)</td><td>(77, 162)</td></tr>
-  <tr><td>01007a</td><td>(14, 60)</td><td>(13, 129)</td><td>01728v</td><td>(1, 8)</td><td>(1, 18)</td></tr>
-  <tr><td>01047u</td><td>(20, 24)</td><td>(33, 71)</td><td>01861a</td><td>(38, 71)</td><td>(62, 148)</td></tr>
-  <tr><td>01164v</td><td>(2, 6)</td><td>(3, 11)</td><td>10131v</td><td>(2, 6)</td><td>(3, 12)</td></tr>
-  <tr><td>01269v</td><td>(2, 6)</td><td>(3, 14)</td><td>31421v</td><td>(0, 8)</td><td>(0, 13)</td></tr>
-</table>
 
 <!-- ============================================================ -->
 <h3>Examples of my own choosing</h3>
