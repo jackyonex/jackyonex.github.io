@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYDE 671 Assignment 1</title>
+<style>
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    max-width: 960px;
+    margin: 40px auto;
+    padding: 0 20px;
+    line-height: 1.6;
+    color: #222;
+    background: #fdfdfb;
+  }
+  h1 { font-size: 2em; margin-bottom: 0.2em; }
+  h2 { margin-top: 2.2em; border-bottom: 1px solid #ccc; padding-bottom: 0.2em; }
+  h3 { margin-top: 1.6em; }
+  code, pre { font-family: Menlo, Consolas, monospace; font-size: 0.9em; }
+  pre { background: #f2f2ee; padding: 12px; overflow-x: auto; border-radius: 4px; }
+  .pair, .grid { display: grid; gap: 14px; margin: 16px 0; }
+  .pair { grid-template-columns: 1fr 1fr; }
+  .grid { grid-template-columns: repeat(3, 1fr); }
+  figure { margin: 0; }
+  figure img { width: 100%; display: block; border: 1px solid #ddd; }
+  figcaption { font-size: 0.85em; color: #555; text-align: center; margin-top: 4px; }
+  .center { max-width: 420px; margin: 16px auto; }
+  table { border-collapse: collapse; margin: 16px 0; font-size: 0.9em; }
+  th, td { border: 1px solid #ccc; padding: 4px 10px; text-align: center; }
+  th { background: #eee; }
+  .note { background: #f6f3e8; border-left: 4px solid #c9b77a; padding: 8px 14px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>SYDE 671 &mdash; Assignment 1</h1>
+<p>Yicheng Xu</p>
+
+<!-- ============================================================ -->
+<h2>Part 1: Fun with Your Camera</h2>
+
+<h3>1. Selfie: the wrong way vs. the right way</h3>
+<div class="pair">
+  <figure><img src="media/selfie_close.jpg" alt="close-up selfie"><figcaption>Close up, 1x</figcaption></figure>
+  <figure><img src="media/selfie_far.jpg" alt="far selfie with zoom"><figcaption>Further away, zoomed in 3.2x</figcaption></figure>
+</div>
+
+<h3>2. Architectural perspective compression</h3>
+<div class="pair">
+  <figure><img src="media/street_far.jpg" alt="street from far away, zoomed in"><figcaption>From far away, zoomed in 5x</figcaption></figure>
+  <figure><img src="media/street_near.jpg" alt="street from closer, no zoom"><figcaption>Walked closer, 1x (no zoom)</figcaption></figure>
+</div>
+
+<h3>3. Dolly zoom</h3>
+<figure class="center"><img src="media/dolly_zoom.gif" alt="dolly zoom gif"><figcaption>Moving back while zooming in</figcaption></figure>
+
+<h3>Why the photos look different</h3>
+<p>Camera distance changes the proportions. In the close selfie, my nose is closer to the camera than my ears,
+so it looks larger. From farther away, that difference in depth matters less, and my face looks more natural.
+The street photos show the same effect: nearby buildings look much larger when I stand close, while the view from
+farther away looks flatter. Zoom changes the size of the image without changing those proportions. In the dolly
+zoom, I stepped back and zoomed in to keep the car about the same size. The house behind it was much farther away,
+so stepping back changed its distance only a little; the zoom made it look larger.</p>
+
+<!-- ============================================================ -->
+<h2>Part 2: Colorizing the Prokudin-Gorskii Collection</h2>
+
+<p>Each glass plate holds three black-and-white exposures of one scene, taken through blue, green, and red filters.
+They appear from top to bottom in B, G, R order. I split the plate into those three channels, shift G and R to
+match B, then stack them into an RGB image.</p>
+
+<h3>Step 1: Splitting the plate</h3>
+<p>I read each plate as a grayscale image and divide its height into three equal parts. Integer division drops
+one or two leftover rows at the bottom. A 1024 &times; 396 plate, for example, gives three channels of
+341 &times; 396 pixels.</p>
+<p>Before comparing channels, I convert the pixel values to floats. The image initially stores each pixel as
+<code>uint8</code>, an integer from 0 to 255. That type cannot represent a negative result: 3 &minus; 5 would
+wrap around to 254 instead of &minus;2. Floats let me calculate those differences correctly. I also divide
+the values by 255 to put them in the range [0, 1].</p>
+<p>Stacking the channels without shifting them produces colored fringes: the three exposures do not line up
+exactly. These pairs show the difference for a small JPEG, a large plate from the provided data, and a plate
+I downloaded myself:</p>
+<div class="pair">
+  <figure><img src="media/naive_01164v.jpg" alt="without alignment"><figcaption>01164v, stacked without alignment</figcaption></figure>
+  <figure><img src="media/single_01164v.jpg" alt="with alignment"><figcaption>01164v, after single-scale alignment</figcaption></figure>
+  <figure><img src="media/naive_01007a.jpg" alt="without alignment"><figcaption>01007a, stacked without alignment</figcaption></figure>
+  <figure><img src="media/pyramid_01007a.jpg" alt="with alignment"><figcaption>01007a, after pyramid alignment</figcaption></figure>
+  <figure><img src="media/naive_loc1_01043.jpg" alt="without alignment"><figcaption>prok.01043, stacked without alignment</figcaption></figure>
+  <figure><img src="media/pyramid_loc1_01043.jpg" alt="with alignment"><figcaption>prok.01043, after pyramid alignment</figcaption></figure>
+</div>
+<p>The shifts are larger on the big plates, so their unaligned color images are hard to make out.</p>
+
+<h3>Step 2: Scoring an alignment with L2</h3>
+<p>I score each possible shift by measuring the L2 distance between the shifted channel and the blue channel:</p>
+<pre>L2(a, b) = sqrt( sum over all pixels of (a - b)^2 )</pre>
+<p>For each pixel, I subtract one channel value from the other, square the difference, add up the squares,
+and take the square root. A <b>smaller</b> score means the channels match more closely.</p>
+<p>I use <code>np.roll</code> to shift a channel. It keeps the image size fixed by wrapping pixels that leave
+one edge around to the opposite edge. Those pixels would give misleading scores, as would the dark plate
+borders, which differ between channels. I therefore score only the middle of each image, leaving out 10% on
+every side. On a small channel, the vertical margin is about 34 rows, more than the largest shift I search,
+so wrapped pixels stay outside the scored area.</p>
+
+<h3>Step 3: Single-scale exhaustive search</h3>
+<p>For the green channel, I try every vertical and horizontal shift from &minus;20 to 20 pixels and score
+each result against blue. That makes 41 &times; 41 = 1681 positions. I keep the shift with the lowest L2 score,
+then repeat the search for red. Blue stays fixed as the reference.</p>
+
+<p>I first tried a &plusmn;15 search window. The results for 01728v and 01598v still showed red and cyan
+fringes, so I tested &plusmn;20, &plusmn;25, and &plusmn;30. At &plusmn;25 and &plusmn;30, 01269v became visibly
+misaligned. The &plusmn;20 window worked best across the 12 small images, so that is the one I used.</p>
+
+<h3>Single-scale results (small JPEGs)</h3>
+<p>Offsets are given as (x, y) in pixels: positive x moves the channel right, positive y moves it down.</p>
+<div class="grid">
+  <figure><img src="media/single_00056v.jpg" alt=""><figcaption>00056v &mdash; G (1, 6), R (1, 13)</figcaption></figure>
+  <figure><img src="media/single_00125v.jpg" alt=""><figcaption>00125v &mdash; G (2, 5), R (1, 10)</figcaption></figure>
+  <figure><img src="media/single_00163v.jpg" alt=""><figcaption>00163v &mdash; G (1, &minus;3), R (1, &minus;4)</figcaption></figure>
+  <figure><img src="media/single_00804v.jpg" alt=""><figcaption>00804v &mdash; G (&minus;2, 6), R (&minus;4, 13)</figcaption></figure>
+  <figure><img src="media/single_01164v.jpg" alt=""><figcaption>01164v &mdash; G (2, 6), R (3, 11)</figcaption></figure>
+  <figure><img src="media/single_01269v.jpg" alt=""><figcaption>01269v &mdash; G (2, 6), R (3, 14)</figcaption></figure>
+  <figure><img src="media/single_01522v.jpg" alt=""><figcaption>01522v &mdash; G (2, 6), R (1, 13)</figcaption></figure>
+  <figure><img src="media/single_01597v.jpg" alt=""><figcaption>01597v &mdash; G (1, 7), R (1, 16)</figcaption></figure>
+  <figure><img src="media/single_01598v.jpg" alt=""><figcaption>01598v &mdash; G (0, 8), R (&minus;1, 17)</figcaption></figure>
+  <figure><img src="media/single_01728v.jpg" alt=""><figcaption>01728v &mdash; G (1, 8), R (1, 18)</figcaption></figure>
+  <figure><img src="media/single_10131v.jpg" alt=""><figcaption>10131v &mdash; G (2, 6), R (3, 12)</figcaption></figure>
+  <figure><img src="media/single_31421v.jpg" alt=""><figcaption>31421v &mdash; G (0, 8), R (0, 13)</figcaption></figure>
+</div>
+
+<!-- ============================================================ -->
+<h3>Step 4: Image pyramid for the large images</h3>
+<p>On the large plates, each color channel is about 3238 &times; 3800 pixels, and the shifts are much bigger
+than on the small images. A wide search at full resolution would exceed the assignment's target of under one
+minute per image. I used an image pyramid instead: start with a small copy to estimate the shift, then refine
+it at larger sizes.</p>
+
+<p><b>Shrinking by half.</b> Before keeping every other row and column, I blur the image so a narrow detail
+is less likely to disappear between sampled pixels. In each direction, the blur uses
+(neighbor + 2 &times; current pixel + other neighbor) / 4. This is a convolution with the kernel
+[1, 2, 1] / 4, applied vertically and then horizontally. The weights add to one, so the blur keeps the
+overall brightness unchanged.</p>
+
+<p><b>Coarse-to-fine search.</b> When the image is small enough, I run the same single-scale search used above.
+Otherwise, I halve both images and search at that smaller size first. I double the returned offset to bring it
+back to the current scale, then check a &plusmn;2 neighborhood for a better match. I repeat this as I return to
+full resolution. The wide search happens only on the smallest copy, where it costs about as much as it does for
+a small JPEG.</p>
+
+<h3>Pyramid results (all images in the data folder)</h3>
+<div class="grid">
+  <figure><img src="media/pyramid_00056v.jpg" alt=""><figcaption>00056v</figcaption></figure>
+  <figure><img src="media/pyramid_00125v.jpg" alt=""><figcaption>00125v</figcaption></figure>
+  <figure><img src="media/pyramid_00163v.jpg" alt=""><figcaption>00163v</figcaption></figure>
+  <figure><img src="media/pyramid_00458u.jpg" alt=""><figcaption>00458u</figcaption></figure>
+  <figure><img src="media/pyramid_00804v.jpg" alt=""><figcaption>00804v</figcaption></figure>
+  <figure><img src="media/pyramid_01007a.jpg" alt=""><figcaption>01007a</figcaption></figure>
+  <figure><img src="media/pyramid_01047u.jpg" alt=""><figcaption>01047u</figcaption></figure>
+  <figure><img src="media/pyramid_01164v.jpg" alt=""><figcaption>01164v</figcaption></figure>
+  <figure><img src="media/pyramid_01269v.jpg" alt=""><figcaption>01269v</figcaption></figure>
+  <figure><img src="media/pyramid_01522v.jpg" alt=""><figcaption>01522v</figcaption></figure>
+  <figure><img src="media/pyramid_01597v.jpg" alt=""><figcaption>01597v</figcaption></figure>
+  <figure><img src="media/pyramid_01598v.jpg" alt=""><figcaption>01598v</figcaption></figure>
+  <figure><img src="media/pyramid_01657u.jpg" alt=""><figcaption>01657u</figcaption></figure>
+  <figure><img src="media/pyramid_01725u.jpg" alt=""><figcaption>01725u</figcaption></figure>
+  <figure><img src="media/pyramid_01728v.jpg" alt=""><figcaption>01728v</figcaption></figure>
+  <figure><img src="media/pyramid_01861a.jpg" alt=""><figcaption>01861a</figcaption></figure>
+  <figure><img src="media/pyramid_10131v.jpg" alt=""><figcaption>10131v</figcaption></figure>
+  <figure><img src="media/pyramid_31421v.jpg" alt=""><figcaption>31421v</figcaption></figure>
+</div>
+
+<p><b>Computed offsets</b> (x, y), relative to the blue image:</p>
+<table>
+  <tr><th>Image</th><th>G offset</th><th>R offset</th><th>Image</th><th>G offset</th><th>R offset</th></tr>
+  <tr><td>00056v</td><td>(1, 6)</td><td>(1, 13)</td><td>01522v</td><td>(2, 6)</td><td>(1, 13)</td></tr>
+  <tr><td>00125v</td><td>(2, 5)</td><td>(1, 10)</td><td>01597v</td><td>(1, 7)</td><td>(1, 16)</td></tr>
+  <tr><td>00163v</td><td>(1, &minus;3)</td><td>(1, &minus;4)</td><td>01598v</td><td>(0, 8)</td><td>(&minus;1, 17)</td></tr>
+  <tr><td>00458u</td><td>(6, 43)</td><td>(32, 87)</td><td>01657u</td><td>(8, 56)</td><td>(11, 116)</td></tr>
+  <tr><td>00804v</td><td>(&minus;2, 6)</td><td>(&minus;4, 13)</td><td>01725u</td><td>(44, 77)</td><td>(77, 162)</td></tr>
+  <tr><td>01007a</td><td>(14, 60)</td><td>(13, 129)</td><td>01728v</td><td>(1, 8)</td><td>(1, 18)</td></tr>
+  <tr><td>01047u</td><td>(20, 24)</td><td>(33, 71)</td><td>01861a</td><td>(38, 71)</td><td>(62, 148)</td></tr>
+  <tr><td>01164v</td><td>(2, 6)</td><td>(3, 11)</td><td>10131v</td><td>(2, 6)</td><td>(3, 12)</td></tr>
+  <tr><td>01269v</td><td>(2, 6)</td><td>(3, 14)</td><td>31421v</td><td>(0, 8)</td><td>(0, 13)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h3>Examples of my own choosing</h3>
+<p>I downloaded three more plates from the Library of Congress Prokudin-Gorskii collection, using the
+&ldquo;digital file from glass neg.&rdquo; version of each record. I ran them through the same code with the same
+parameters.</p>
+<div class="grid">
+  <figure><img src="media/pyramid_loc1_01043.jpg" alt=""><figcaption>prok.01043 &mdash; G (10, &minus;16), R (17, 11)</figcaption></figure>
+  <figure><img src="media/pyramid_loc2_01050.jpg" alt=""><figcaption>prok.01050 &mdash; G (1, 32), R (&minus;12, 78)</figcaption></figure>
+  <figure><img src="media/pyramid_loc3_01040.jpg" alt=""><figcaption>prok.01040 &mdash; G (24, 6), R (32, 22)</figcaption></figure>
+</div>
+
+
+<!-- ============================================================ -->
+<h3>Remaining problems</h3>
+<ul>
+  <li><b>00056v (church in the mountains):</b> Colored patterns remain in the sky. I suspect they come from
+  damage to the glass plate, since they are visible on the original plate too.</li>
+  <li><b>Borders:</b> Colored stripes remain around the results. The plate borders do not line up across
+  channels, and <code>np.roll</code> wraps displaced pixels around the edges. I have not cropped these edges.</li>
+</ul>
+
+</body>
+</html>
