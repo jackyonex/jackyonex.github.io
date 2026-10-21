@@ -61,10 +61,9 @@ This section uses numpy only.</p>
 def add_zero(im, top, bottom, left, right):
     return np.pad(im, ((top, bottom), (left, right)))
 
-# four for loops
 def con_loops(im, kernel):
     kh, kw = kernel.shape
-    k = kernel[::-1, ::-1]                       # flip the kernel
+    k = kernel[::-1, ::-1]
     top, left = kh // 2, kw // 2
     padded = add_zero(im, top, kh - 1 - top, left, kw - 1 - left)
 
@@ -79,7 +78,6 @@ def con_loops(im, kernel):
             out[i, j] = total
     return out
 
-# two for loops: loop over the kernel, shift the whole image each time
 def con_loops_2(im, kernel):
     kh, kw = kernel.shape
     k = kernel[::-1, ::-1]
@@ -146,8 +144,8 @@ from about 10% to 30% of it:</p>
   <figure><img src="media/1_2_edge_0.25.png" alt=""><figcaption><b>0.25 (chosen)</b></figcaption></figure>
   <figure><img src="media/1_2_edge_0.30.png" alt=""><figcaption>0.30</figcaption></figure>
 </div>
-<p>I started at 0.10, where the grass turned into white speckles. Raising the threshold to 0.15 and 0.20 removed part of the speckles, but the grass was still full
-of them. At 0.25 most of that noise was gone, while the outline of the man, the camera, the tripod legs and the
+<p>I started at 0.10, where the grass turned into white speckles. At 0.15 the grass was still full of them, and at
+0.20 there were still small speckles scattered over it. At 0.25 most of that noise was gone, while the outline of the man, the camera, the tripod legs and the
 buildings on the horizon remained. At 0.30 the lower edge of the coat and parts of the buildings started to break
 up, so I went back to 0.25. A few grass speckles are still left at 0.25, but a higher threshold that removes them
 would also remove real edges.</p>
@@ -161,7 +159,7 @@ product with itself to get a 7 &times; 7 2D Gaussian.</p>
 &sigma; = 0.5, 7 &times; 7 with &sigma; = 1 and 13 &times; 13 with &sigma; = 2, and for each one the thresholds
 0.08 to 0.18. With &sigma; = 0.5 the blur was too weak: the grass was still full of speckles
 up to a threshold of 0.12, much like Part 1.2. With &sigma; = 2 the edges became very thick, the camera turned into a
-few blobs, and once the threshold was high enough to clear the grass, the tripod legs and the buildings broke apart.
+few blobs, and at the higher thresholds the tripod legs and the buildings broke apart.
 &sigma; = 1 removed the grass noise while keeping the camera and the tripod, so I used it.</p>
 
 
@@ -175,8 +173,8 @@ Part 1.2 on the blurred image.</p>
 </div>
 <p>Blurring spreads each edge over several pixels, so the gradients become weaker. With the threshold of 0.25 from
 Part 1.2, most of the buildings and parts of the camera disappeared. After blurring, the largest gradient magnitude
-(again not counting the border frame) drops to about 0.55, so I tried lower thresholds in the same range relative to
-it:</p>
+(again not counting the border frame) drops to about 0.55, so I tried lower thresholds in about the same range relative
+to it:</p>
 <div class="grid">
   <figure><img src="media/1_3_blur_edge_0.08.png" alt=""><figcaption>0.08</figcaption></figure>
   <figure><img src="media/1_3_blur_edge_0.10.png" alt=""><figcaption>0.10</figcaption></figure>
@@ -186,7 +184,7 @@ it:</p>
 </div>
 <p>At 0.08 and 0.10 there were still short lines in the grass and around the buildings, and at 0.12 a few
 remained. At 0.15 the grass was clean, and the man, the camera, the tripod and the horizon were still there.
-At 0.18 most of the buildings on the horizon and the lower edge of the coat disappeared, so I kept 0.15.</p>
+At 0.18 parts of the buildings on the horizon and the lower edge of the coat disappeared, so I kept 0.15.</p>
 
 <p><b>Differences from the finite difference result.</b></p>
 <ul>
@@ -231,9 +229,9 @@ angle myself:</p>
 so &minus;180&deg; and 180&deg; get the same color), saturation = 1, and value = the gradient
 magnitude divided by its 99th percentile (so flat areas are black and strong edges are bright).</p>
 <p>For the brightness, I tried dividing the magnitude by its largest value, by its 99th percentile and by its 95th
-percentile. With the largest value most edges were dim, and the camera and the buildings were hard to see. With the
-95th percentile the grass turned into bright colored speckles. The 99th percentile kept the edges bright without
-lighting up the grass, so I used it.</p>
+percentile. With the largest value the weaker edges, such as the buildings, were dimmer. With the 95th percentile
+the grass became brighter and more speckled. The 99th percentile kept the buildings visible without lighting up the
+grass as much, so I used it.</p>
 <figure class="center"><img src="media/1_bw_orientation.png" alt=""><figcaption>Gradient orientation of the cameraman</figcaption></figure>
 
 <!-- ============================================================ -->
@@ -417,7 +415,7 @@ multiplied by (1 &minus; the same level of the mask's Gaussian stack), and the t
 <p><b>Choosing the stack.</b> I tried 3, 5 and 7 levels starting at &sigma; = 2, and 5 levels starting at &sigma; = 1
 and &sigma; = 4. With 3 levels there was still a clear vertical line between the apple and the orange. Starting at
 &sigma; = 1, a faint line was still visible. With 7 levels, or starting at &sigma; = 4, the colors mixed over almost
-the whole fruit: the apple half turned orange and the background above the fruit changed too. 5 levels starting at
+the whole fruit and the apple half turned orange. 5 levels starting at
 &sigma; = 2 hid the seam while the apple stayed red and the orange stayed orange, so I used it for the stacks in
 2.3 and for all blends.</p>
 <figure class="narrow"><img src="media/2_4_oraple_blend_color.png" alt=""><figcaption>Multiresolution blend</figcaption></figure>
