@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYDE 671 Assignment 3</title>
+<style>
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    max-width: 960px;
+    margin: 40px auto;
+    padding: 0 20px;
+    line-height: 1.6;
+    color: #222;
+    background: #fdfdfb;
+  }
+  h1 { font-size: 2em; margin-bottom: 0.2em; }
+  h2 { margin-top: 2.2em; border-bottom: 1px solid #ccc; padding-bottom: 0.2em; }
+  h3 { margin-top: 1.6em; }
+  code, pre { font-family: Menlo, Consolas, monospace; font-size: 0.9em; }
+  pre { background: #f2f2ee; padding: 12px; overflow-x: auto; border-radius: 4px; }
+  .pair, .grid, .four { display: grid; gap: 14px; margin: 16px 0; }
+  .pair { grid-template-columns: 1fr 1fr; }
+  .grid { grid-template-columns: repeat(3, 1fr); }
+  .four { grid-template-columns: repeat(4, 1fr); }
+  .narrow { max-width: 560px; margin: 16px auto; }
+  figure { break-inside: avoid; page-break-inside: avoid; }
+  h2, h3 { break-after: avoid; page-break-after: avoid; }
+  figure { margin: 0; }
+  figure img { width: 100%; display: block; border: 1px solid #ddd; }
+  figcaption { font-size: 0.85em; color: #555; text-align: center; margin-top: 4px; }
+  .wide { margin: 16px 0; }
+  .zoom img { image-rendering: pixelated; }
+  table { border-collapse: collapse; margin: 16px 0; font-size: 0.9em; }
+  th, td { border: 1px solid #ccc; padding: 4px 10px; text-align: center; }
+  th { background: #eee; }
+  @media (max-width: 700px) { .grid, .four { grid-template-columns: 1fr 1fr; } }
+  @media print { pre { white-space: pre-wrap; } }
+</style>
+</head>
+<body>
+
+<h1>SYDE 671 Assignment 3</h1>
+<p>Yicheng Xu</p>
+
+<h2>Part A: Image Warping and Mosaicing</h2>
+
+<h3>A.1 Shoot the pictures</h3>
+<p>I shot two sets of photos with my phone held in my hand. For each set I stood in one spot, turned the phone and kept the horizon level. Neighboring photos overlap by about half. The first set is two photos of a shopping plaza, used for Part A. The second set is three photos of a basketball hoop in an indoor gym, used for Part B.</p>
+<div class="pair">
+  <figure><img src="media/plaza_left.jpg" alt=""><figcaption>Plaza, left</figcaption></figure>
+  <figure><img src="media/plaza_right.jpg" alt=""><figcaption>Plaza, right</figcaption></figure>
+</div>
+<div class="grid">
+  <figure><img src="media/gym_left.jpg" alt=""><figcaption>Gym, left</figcaption></figure>
+  <figure><img src="media/gym_middle.jpg" alt=""><figcaption>Gym, middle</figcaption></figure>
+  <figure><img src="media/gym_right.jpg" alt=""><figcaption>Gym, right</figcaption></figure>
+</div>
+
+<h3>A.2 Recover homographies</h3>
+<p>I set the lower right entry of H to 1, so H has 8 unknowns. <code>computeH(im1_pts, im2_pts)</code> turns each point pair into two equations of Ah = b. I used 8 pairs and solved the system by least squares with <code>np.linalg.lstsq</code>.</p>
+<figure class="wide"><img src="media/a2_points.jpg" alt=""><figcaption>Correspondences on the two plaza photos</figcaption></figure>
+<pre>A =
+[[     538.5      332.         1.         0.         0.         0.    -63004.5   -38844. ]
+ [       0.         0.         0.       538.5      332.         1.   -114700.5   -70716. ]
+ [     950.       719.         1.         0.         0.         0.   -513000.   -388260. ]
+ [       0.         0.         0.       950.       719.         1.   -646000.   -488920. ]
+ [    1261.       492.         1.         0.         0.         0.  -1035281.   -403932. ]
+ [       0.         0.         0.      1261.       492.         1.   -627978.   -245016. ]
+ [     480.       977.         1.         0.         0.         0.     -7200.    -14655. ]
+ [       0.         0.         0.       480.       977.         1.   -441600.   -898840. ]
+ [    1055.       966.         1.         0.         0.         0.   -653045.   -597954. ]
+ [       0.         0.         0.      1055.       966.         1.   -971655.   -889686. ]
+ [     817.      1324.         1.         0.         0.         0.   -303107.   -491204. ]
+ [       0.         0.         0.       817.      1324.         1.  -1038407.  -1682804. ]
+ [     843.      1279.         1.         0.         0.         0.   -335514.   -509042. ]
+ [       0.         0.         0.       843.      1279.         1.  -1033096.5 -1567414.5]
+ [     687.      1226.         1.         0.         0.         0.   -166254.   -296692. ]
+ [       0.         0.         0.       687.      1226.         1.   -810660.  -1446680. ]]
+
+b =
+[ 117.   213.   540.   680.   821.   498.    15.   920.   619.   921.   371.  1271.   398.  1225.5  242.  1180. ]
+
+H =
+[[   1.4901   -0.0606 -638.9609]
+ [   0.3597    1.3567 -387.7736]
+ [   0.0004    0.        1.    ]]</pre>
+
+<h3>A.3 Warp the images</h3>
+<p><code>warpImageNearestNeighbor</code> and <code>warpImageBilinear</code> both use inverse warping. I send the four corners of the input through H to get the bounding box of the output, then send every output pixel back through the inverse of H to the input. Nearest neighbor rounds to the nearest pixel, and bilinear takes the weighted average of the four neighboring pixels. An alpha mask marks the output pixels that fall inside the input, and the rest stay black.</p>
+<p>For rectification I photographed a poster on a laundromat wall from its left side and from its right side. In each photo I clicked the four poster corners and mapped them to a rectangle. The whole photo is warped.</p>
+<div class="pair">
+  <figure><img src="media/a3_left_corners.jpg" alt=""><figcaption>Poster from the left, corners clicked</figcaption></figure>
+  <figure><img src="media/a3_right_corners.jpg" alt=""><figcaption>Poster from the right, corners clicked</figcaption></figure>
+</div>
+<div class="pair">
+  <figure><img src="media/a3_left_nearest.png" alt=""><figcaption>Poster from the left, nearest neighbor</figcaption></figure>
+  <figure><img src="media/a3_left_bilinear.png" alt=""><figcaption>Poster from the left, bilinear</figcaption></figure>
+</div>
+<div class="pair">
+  <figure><img src="media/a3_right_nearest.png" alt=""><figcaption>Poster from the right, nearest neighbor</figcaption></figure>
+  <figure><img src="media/a3_right_bilinear.png" alt=""><figcaption>Poster from the right, bilinear</figcaption></figure>
+</div>
+<p>Zoomed in, nearest neighbor gives jagged letters and brick edges, and bilinear gives smooth but slightly softer edges.</p>
+<div class="four zoom">
+  <figure><img src="media/a3_left_nearest_zoom.png" alt=""><figcaption>Left, nearest neighbor</figcaption></figure>
+  <figure><img src="media/a3_left_bilinear_zoom.png" alt=""><figcaption>Left, bilinear</figcaption></figure>
+  <figure><img src="media/a3_right_nearest_zoom.png" alt=""><figcaption>Right, nearest neighbor</figcaption></figure>
+  <figure><img src="media/a3_right_bilinear_zoom.png" alt=""><figcaption>Right, bilinear</figcaption></figure>
+</div>
+<p>Running times on my laptop:</p>
+<table>
+  <tr><th>Photo</th><th>Output size</th><th>Nearest neighbor</th><th>Bilinear</th></tr>
+  <tr><td>Poster from the left</td><td>3036 &times; 3942</td><td>3.41 s</td><td>7.03 s</td></tr>
+  <tr><td>Poster from the right</td><td>3361 &times; 3456</td><td>1.91 s</td><td>4.88 s</td></tr>
+</table>
+<p>Bilinear takes about two to two and a half times as long, because it mixes four pixels for every output pixel while nearest neighbor reads one, but its edges are smooth.</p>
+
+<h3>A.4 Blend the images into a mosaic</h3>
+<p>I keep the right photo unwarped as the reference and warp the left photo into it. I find the mosaic size from the warped corners and warp both photos into it in one shot. Each photo gets an alpha that is 1 at its center and falls linearly to 0 at its edges. I warp the alpha with the photo, and each mosaic pixel is the sum of alpha times color divided by the sum of the alphas. I tried each photo as the reference and kept the right one, where the building and the cars keep their shape better.</p>
+<figure class="wide"><img src="media/a4_mosaic.png" alt=""><figcaption>Mosaic of the two plaza photos</figcaption></figure>
+
+<h2>Part B: Feature Matching for Autostitching</h2>
+<p>Part B uses the three gym photos.</p>
+
+<h3>B.1 Harris corners and ANMS</h3>
+<p>I found the corners with the provided <code>harris.py</code> and applied adaptive non-maximal suppression from
+Section 3 of the paper. Each corner gets a radius, the
+distance to the nearest corner that is clearly stronger (its own strength is below 0.9 times the other one), and I
+keep the 500 corners with the largest radius.</p>
+<div class="pair">
+  <figure><img src="media/b1_corners_all.jpg" alt=""><figcaption>Harris corners without ANMS</figcaption></figure>
+  <figure><img src="media/b1_corners_anms.jpg" alt=""><figcaption>Corners with ANMS (500)</figcaption></figure>
+</div>
+
+<h3>B.2 Feature descriptors</h3>
+<p>I take a 40 &times; 40 window around each corner from a Gaussian blurred copy of the photo and sample every fifth pixel to get an 8 &times; 8 patch, then subtract the mean and divide by the standard deviation. I tried &sigma; = 1, 2 and 3 on the matches in B.3. With &sigma; = 1 fewer points match, and with &sigma; = 3 more long wrong lines cross the photos, so I kept &sigma; = 2.</p>
+<figure class="wide"><img src="media/b2_features.jpg" alt=""><figcaption>6 features: location, 40 &times; 40 window, 8 &times; 8 descriptor (enlarged)</figcaption></figure>
+
+<h3>B.3 Feature matching</h3>
+<p>For each descriptor I find the closest and second closest descriptor in the other photo and keep the match when the ratio of their squared distances is below a threshold. In Figure 6b of the paper the incorrect matches stay low below a ratio of about 0.6 and pass the correct matches at about 0.67, so I tried thresholds of 0.5, 0.6 and 0.7. With 0.5 fewer points match, and with 0.7 more long wrong lines cross the photos, so I kept 0.6.</p>
+<figure class="wide"><img src="media/b3_matches_1_2.jpg" alt=""><figcaption>Matches, left and middle</figcaption></figure>
+<figure class="wide"><img src="media/b3_matches_2_3.jpg" alt=""><figcaption>Matches, middle and right</figcaption></figure>
+
+<h3>B.4 RANSAC and the mosaic</h3>
+<p>Each RANSAC round picks 4 matches at random, computes H with <code>computeH</code> from Part A, and counts the matches that land within &delta; pixels after mapping. I keep the largest set of inliers and compute H again from all of them by least squares. I tried &delta; = 1, 2 and 3 pixels on the mosaic. With &delta; = 1 the floor line shows twice, and with &delta; = 2 and 3 it is a single line, so I kept &delta; = 2.</p>
+<p>The mosaic uses the Part A code with the middle photo as the reference. For the manual mosaic I clicked 8 points for each pair. The manual and automatic mosaics look almost the same, and the hoop and the floor lines line up in both.</p>
+<figure class="wide"><img src="media/b4_manual_vs_auto.jpg" alt=""><figcaption>Manual (left) and automatic (right) mosaics of the gym photos</figcaption></figure>
+
+</body>
+</html>
